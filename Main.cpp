@@ -10,7 +10,7 @@ int main() {
 	int max_epoch = 5000;
 	double training_rate = 0.01; //i hate this f*cking variable so much (i set it to 0 by accident and spent 3+ hours wondering why my network was getting dumber with each epoch)
 	std::mt19937 generator(2);
-	ANN NN1({ 4,8,16 });
+	ANN NN1({ 4,8,16 }, 0); //0 for relu, 1 for sigmoid
 	int epoch = 0;
 
 	//training loop
@@ -40,18 +40,21 @@ int main() {
 		epoch++;
 	}
 
+	//user testing bit
 	while (true) {
 		std::cout << "\n\nEnter a binary number: ";
 		std::string input;
 		std::cin >> input;
-		std::cout << "\n-----------------------------\n";
+		std::cout << "\n-----------------------------\n'Condfidence' value for each number\n";
 		Matrix input_mat(4, 1);
 		for (int i = 0; i < input.length(); ++i) {
 			int num = input[i] - '0';
 			input_mat(i, 0) = num+0.001; //mapping the binary string to the input matrix
 		}
 		Matrix outputmat = NN1.feedforward(input_mat);
-		outputmat.print();
+		for (int row = 0; row < outputmat.rows(); ++row) {
+			std::cout << std::setw(2) << row << ": " << std::setw(4) << std::fixed << std::setprecision(2) << (outputmat(row, 0) * 100) << "%\n";
+		}
 		std::cout << "\n-----------------------------\n";
 		int output = nn_utils::argmax(outputmat);
 		std::cout << "Program thinks " << input << " is the number " << output << "\n\n";
