@@ -25,44 +25,25 @@ namespace nn_utils {
 }
 
 Matrix nn_utils::sigmoid(const Matrix& mat) {
-	std::vector<std::vector<double>> result_data;
-	result_data.assign(mat.rows(), std::vector<double>(mat.cols(), 0.0));
-	for (int rows = 0; rows < mat.rows(); ++rows)
+	std::vector<std::vector<double>> result_data(mat.rows(), std::vector<double>(mat.cols()));
+	for (int i = 0; i < mat.rows(); ++i)
 	{
-		for (int cols = 0; cols < mat.cols(); ++cols)
+		for (int j = 0; j < mat.cols(); ++j)
 		{
-			double z = 0.0;
-			//clamping to prevent the output from being a very big or very small number
-			if (mat(rows, cols) > MAX_EXP_ARG) {
-				z = MAX_EXP_ARG;
-			}
-			else if (mat(rows, cols) < MIN_EXP_ARG) {
-				z = MIN_EXP_ARG;
-			}
-			else {
-				z = mat(rows, cols);
-			}
-
-			result_data[rows][cols] = 1.0 / (1.0 + exp(-z));
+			result_data[i][j] = 1.0 / (1.0 + exp(-mat(i, j)));
 		}
 	}
-	Matrix result(result_data);
-	return result;
+	return Matrix(result_data);
 }
 
 Matrix nn_utils::dsigmoid(const Matrix& mat) {
-	//derivative of sigmoid function is simply = sig(x)(1-sig(x))
-	Matrix A = nn_utils::sigmoid(mat);
-
-	std::vector<std::vector<double>> result_data;
-	result_data.assign(mat.rows(), std::vector<double>(mat.cols(), 0.0));
-
-	for (int rows = 0; rows < mat.rows(); ++rows)
+	std::vector<std::vector<double>> result_data(mat.rows(), std::vector<double>(mat.cols()));
+	Matrix sigmat = nn_utils::sigmoid(mat);
+	for (int i = 0; i < mat.rows(); ++i)
 	{
-		for (int cols = 0; cols < mat.cols(); ++cols)
+		for (int j = 0; j < mat.cols(); ++j)
 		{
-			double a = A(rows, cols);
-			result_data[rows][cols] = a * (1.0 - a);
+			result_data[i][j] = sigmat(i, j) * (1.0 - sigmat(i, j));
 		}
 	}
 	return Matrix(result_data);
@@ -178,10 +159,24 @@ class Layer {
 public:
 	Matrix weights;
 	Matrix bias;
-	Layer(int input_size, int output_size) {
-		weights = nn_utils::he_init(input_size, output_size);
-		bias = Matrix(output_size, 1); //making a bias matrix with all 0
-		bias.randomise(2, 0, 0.2);
+	Layer(int input_size, int output_size, int init_func) {
+		switch(init_func) {
+		case(0):
+			weights = nn_utils::he_init(input_size, output_size); //init func for ReLu
+			bias = Matrix(output_size, 1); //making a bias matrix
+			bias.randomise(2, 0, 0.2); //randomising with small positive numbers as ReLu favours this
+			break;
+		case(1):
+			weights = nn_utils::glorot(input_size, output_size); //init func for sigmoid
+			bias = Matrix(output_size, 1); //making a bias matrix with all 0 as sigmoid favour this
+			break;
+		default:
+			//by default, choose relu because its better and im too lazy to put in a loop to ask user again
+			weights = nn_utils::he_init(input_size, output_size); //init func for ReLu
+			bias = Matrix(output_size, 1); //making a bias matrix
+			bias.randomise(2, 0, 0.2); //randomising with small positive numbers as ReLu favours this
+			break;
+		}
 	}
 	Layer() {
 		weights = Matrix();
@@ -198,15 +193,17 @@ private:
 	std::vector<Matrix> activations; //Output of each layer (after non linear function applied)
 	std::vector<Matrix> net_input; //Output of each layer (before non linear function applied)
 
+	int nl_func = 0; //chooses the non linear function applied, 0 for ReLu and 1 for Sigmoid
+
 public:
 
-	ANN(std::vector<int> sizes) {
+	ANN(std::vector<int> sizes, int func) {
 		//constructor method for the ANN
 		if (sizes.size() < 2) { //checks if the given sizes vector has an input and output layer (at least 2 layers needed)
 			throw::std::invalid_argument("NEURAL NETWORK MUST HAVE AT LEAST 2 LAYERS");
 			return;
 		}
-
+		nl_func = func;
 		for (int nlayer = 0; nlayer < sizes.size() - 1; ++nlayer) {
 			/*
 			if sizes = (4, 8, 16)
@@ -217,7 +214,7 @@ public:
 			int layer_inputs = sizes[nlayer];
 			int layer_outputs = sizes[nlayer + 1];
 
-			Layer new_layer = Layer(layer_inputs, layer_outputs);
+			Layer new_layer = Layer(layer_inputs, layer_outputs, func);
 			layers.emplace_back(new_layer); //add the new layer object to the layer vector
 		}
 	}
@@ -238,7 +235,17 @@ public:
 
 			net_input.emplace_back(z);
 
-			Matrix layer_activation = nn_utils::relu(z); //apply non linear function to z
+			Matrix layer_activation;
+			switch (nl_func) {
+			case(1):
+				layer_activation = nn_utils::sigmoid(z); //apply non linear function to z
+				break;
+			default:
+				//again, default is relu because its better and im lazy
+				layer_activation = nn_utils::relu(z); //apply non linear function to z
+				break;
+			}
+			
 			activations.emplace_back(layer_activation);
 		}
 
@@ -271,8 +278,17 @@ public:
 			prev_layer_weights.transpose(); //transpose the weight matrix
 			Matrix hidden_layer_error =  prev_layer_weights * layer_errors.back();
 			
-			Matrix dsig = nn_utils::drelu(net_input[nlayer]);
-			hidden_layer_error.element_multiply(dsig);
+			Matrix derivative_func;
+			switch (nl_func) {
+			case(1):
+				derivative_func = nn_utils::dsigmoid(net_input[nlayer]);
+				break;
+			default:
+				//again, same reason. if you couldnt tell, i love relu
+				derivative_func = nn_utils::drelu(net_input[nlayer]);
+				break;
+			}
+			hidden_layer_error.element_multiply(derivative_func);
 
 			layer_errors.emplace_back(hidden_layer_error);
 		}
