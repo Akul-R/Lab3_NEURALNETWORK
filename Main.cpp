@@ -8,55 +8,18 @@
 
 int main() {
 	int max_epoch = 5000;
+	int out_epoch = 500; //how many epochs between prints
+
+	const int bits = 4; //specify how many bit input you are doing. bear in mind, larger bits take a lot longer to train properly
+
 	double training_rate = 0.01; //i hate this f*cking variable so much (i set it to 0 by accident and spent 3+ hours wondering why my network was getting dumber with each epoch)
-	std::mt19937 generator(2);
-	ANN NN1({ 4,8,16 }, 0); //0 for relu, 1 for sigmoid
+	ANN NN1({4, 8, 16}, "relu", bits); //first arg is vector for layer and their sizes, 2nd is activation function and 3rd is number of bits
 	int epoch = 0;
 
-	//training loop
-	std::uniform_int_distribution<> distribution(0, 15); //for 4 bit binary
-	while (epoch < max_epoch) {
-		std::cout << "Epoch: " << std::setw(5) << epoch << "| ";
-
-		int input = distribution(generator);
-		std::cout << "Input: " << std::setw(2) << input << "| ";
-
-		Matrix input_mat(4, 1); //creating input matrix
-		Matrix target_mat(16, 1); //creating target matrix
-		target_mat(input, 0) = 1;
-		std::string input_binary = std::bitset<4>(input).to_string(); //converts the input to binary, 2 -> 0010
-		for (int i = 0; i < input_binary.length(); ++i) {
-			int num = input_binary[i] - '0';
-			input_mat(i, 0) = num+0.001; //mapping the binary string to the input matrix
-		}
-
-		Matrix output_mat = NN1.feedforward(input_mat);
-		int output = nn_utils::argmax(output_mat);
-		std::cout << "Output: " << std::setw(2) << output << "| ";
-
-		double error = NN1.update(target_mat, training_rate);
-		std::cout << "CCE: " << std::setw(6) << error << "\n";
-
-		epoch++;
-	}
-
-	//user testing bit
-	while (true) {
-		std::cout << "\n\nEnter a binary number: ";
-		std::string input;
-		std::cin >> input;
-		std::cout << "\n-----------------------------\n'Condfidence' value for each number\n";
-		Matrix input_mat(4, 1);
-		for (int i = 0; i < input.length(); ++i) {
-			int num = input[i] - '0';
-			input_mat(i, 0) = num+0.001; //mapping the binary string to the input matrix
-		}
-		Matrix outputmat = NN1.feedforward(input_mat);
-		for (int row = 0; row < outputmat.rows(); ++row) {
-			std::cout << std::setw(2) << row << ": " << std::setw(4) << std::fixed << std::setprecision(2) << (outputmat(row, 0) * 100) << "%\n";
-		}
-		std::cout << "\n-----------------------------\n";
-		int output = nn_utils::argmax(outputmat);
-		std::cout << "Program thinks " << input << " is the number " << output << "\n\n";
-	}
+	NN1.training_start(max_epoch, out_epoch, training_rate);
+	NN1.save("4BIT_weight.wts", "4BIT_bias.bss");
+	NN1.accuracy(true);
+	NN1.testing(false);
 }
+
+
