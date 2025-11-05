@@ -1,10 +1,4 @@
-#include "Matrix.h"
 #include "NeuralNetwork.h"
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <random>
-#include <bitset>
 
 int main() {
 	int max_epoch = 5000;
@@ -19,7 +13,7 @@ int main() {
 	NN1.training_start(max_epoch, out_epoch, training_rate);
 	NN1.save("4BIT_weight.wts", "4BIT_bias.bss");
 	NN1.accuracy(true);
-	NN1.testing(false);
+	NN1.testing(true);
 }
 
 
